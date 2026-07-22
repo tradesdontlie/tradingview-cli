@@ -28,8 +28,8 @@ jobs:
         run: npm run lint
 
       - name: Unit tests
-        # test:unit excludes e2e.test.js, which needs a live TradingView Desktop + CDP.
-        run: npm run test:unit
+        # The default suite excludes live-CDP tests, which need TradingView Desktop.
+        run: npm test
 
       - name: Audit (high severity)
         run: npm audit --audit-level=high
