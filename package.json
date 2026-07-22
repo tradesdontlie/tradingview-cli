@@ -1,0 +1,35 @@
+{
+  "name": "tradingview-cli",
+  "version": "1.0.0",
+  "description": "Control TradingView Desktop from the terminal via Chrome DevTools Protocol",
+  "type": "module",
+  "bin": {
+    "tv": "src/cli/index.js"
+  },
+  "scripts": {
+    "tv": "node src/cli/index.js",
+    "lint": "eslint src/ tests/",
+    "test": "npm run test:unit",
+    "test:unit": "node --test tests/cli.test.js tests/extraction.test.js tests/pine_analyze.test.js tests/sanitization.test.js tests/replay.test.js tests/launch.test.js tests/chart_indicator.test.js tests/chart_history.test.js tests/update.test.js",
+    "test:e2e": "node --test tests/e2e.test.js",
+    "test:all": "node --test tests/*.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tradesdontlie/tradingview-cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/tradesdontlie/tradingview-cli/issues"
+  },
+  "homepage": "https://github.com/tradesdontlie/tradingview-cli#readme",
+  "license": "MIT",
+  "dependencies": {
+    "chrome-remote-interface": "^0.33.2"
+  },
+  "devDependencies": {
+    "eslint": "^9.39.4"
+  }
+}
