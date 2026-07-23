@@ -1,5 +1,6 @@
 import { register } from '../router.js';
 import * as core from '../../core/stream.js';
+import { streamOhlcvFeeds } from '../../core/multi-feed.js';
 
 // Stream commands are special — they don't return JSON, they write JSONL to stdout forever.
 // The router's execute() wrapper won't work since these never resolve.
@@ -68,6 +69,16 @@ register('stream', {
       },
       handler: async (opts) => {
         await core.streamTables({ interval: opts.interval ? Number(opts.interval) : undefined, filter: opts.filter });
+        process.exit(0);
+      },
+    }],
+    ['ohlcv', {
+      description: 'Stream multiple SYMBOL@TIMEFRAME feeds as JSONL',
+      options: {
+        interval: { type: 'string', short: 'i', description: 'Poll interval in ms (default 250, minimum 100)' },
+      },
+      handler: async (opts, positionals) => {
+        await streamOhlcvFeeds({ feedSpecs: positionals, interval: opts.interval });
         process.exit(0);
       },
     }],

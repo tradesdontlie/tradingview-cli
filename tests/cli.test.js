@@ -7,7 +7,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync, execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { writeFileSync, unlinkSync } from 'fs';
@@ -72,6 +72,13 @@ describe('CLI — help and routing', () => {
     assert.ok(stdout.includes('check'));
   });
 
+  it('stream help advertises multi-feed OHLCV syntax', () => {
+    const { stdout, exitCode } = run(['stream', '--help']);
+    assert.equal(exitCode, 0);
+    assert.match(stdout, /ohlcv/);
+    assert.match(stdout, /SYMBOL@TIMEFRAME/);
+  });
+
   it('ohlcv --help shows options', () => {
     const { stdout, exitCode } = run(['ohlcv', '--help']);
     assert.equal(exitCode, 0);
@@ -88,6 +95,7 @@ describe('CLI — pine analyze (offline)', () => {
     const result = JSON.parse(stdout);
     assert.equal(result.success, true);
     assert.equal(result.issue_count, 0);
+    assert.match(result.note, /tv pine compile/);
   });
 
   it('detects array out of bounds', () => {

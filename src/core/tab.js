@@ -111,7 +111,7 @@ async function withTarget(targetId, fn) {
  *   layout: '<name>' -> open the saved layout whose title contains <name>
  * Reuses an already-open landing tab instead of opening another one.
  */
-export async function newTab({ layout, name } = {}) {
+export async function newTab({ layout, name, reconnect = true } = {}) {
   let landing = await findLandingTarget();
   let shellCounts = null;
 
@@ -237,7 +237,7 @@ export async function newTab({ layout, name } = {}) {
 
   // Give the chart a moment to boot, then follow it.
   await new Promise(r => setTimeout(r, 2000));
-  await reconnectTo(chartTarget.id);
+  if (reconnect) await reconnectTo(chartTarget.id);
   return {
     success: true,
     action: wantNew ? 'new_layout_created' : 'layout_opened_in_new_tab',
@@ -252,7 +252,7 @@ export async function newTab({ layout, name } = {}) {
 export async function closeTab() {
   const before = await withShell((evalIn) => evalIn(`document.querySelectorAll('.tabs-container .tab').length`));
   if (before <= 1) {
-    throw new Error('Cannot close the last tab. Use tv_launch to restart TradingView instead.');
+    throw new Error('Cannot close the last tab. Use `tv launch` to restart TradingView instead.');
   }
 
   const result = await withShell(async (evalIn) => {
