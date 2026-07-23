@@ -257,16 +257,27 @@ describe('autoplay() — delay validation', () => {
 // ── stop() ───────────────────────────────────────────────────────────────
 
 describe('stop()', () => {
-  it('calls stopReplay when started', async () => {
-    const { _deps, evaluate } = mockDeps({
-      'isReplayStarted': true,
-      'stopReplay': undefined,
-    });
+  it('calls stopReplay and waits until replay is actually stopped', async () => {
+    let stateReads = 0;
+    const evaluate = async (expr) => {
+      if (expr.includes('isReplayStarted')) return stateReads++ < 2;
+      return undefined;
+    };
+    evaluate.calls = [];
+    const _deps = { evaluate, getReplayApi: mockGetReplayApi(), sleep: async () => {} };
     const result = await stop({ _deps });
     assert.equal(result.success, true);
     assert.equal(result.action, 'replay_stopped');
-    const stopCall = evaluate.calls.find(c => c.includes('stopReplay'));
-    assert.ok(stopCall, 'stopReplay was called');
+    assert.equal(stateReads, 3, 'replay state was polled through the stopped transition');
+  });
+
+  it('does not report success while replay remains active', async () => {
+    const { _deps } = mockDeps({
+      'isReplayStarted': true,
+      'stopReplay': undefined,
+    });
+    _deps.sleep = async () => {};
+    await assert.rejects(() => stop({ _deps }), /did not stop/);
   });
 
   it('returns already_stopped when not started', async () => {
@@ -288,7 +299,7 @@ describe('stop()', () => {
 describe('trade()', () => {
   for (const action of ['buy', 'sell', 'close']) {
     it(`executes ${action} action`, async () => {
-      const { _deps, evaluate } = mockDeps({
+      const { _deps } = mockDeps({
         'isReplayStarted': true,
         [action === 'close' ? 'closePosition' : action]: undefined,
         'position': 1,

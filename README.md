@@ -109,7 +109,7 @@ Run `tv --help`, `tv <command> --help`, or `tv <command> <subcommand> --help` fo
 | Layouts and indicators | `layout list`, `layout switch`, `indicator add`, `remove`, `toggle`, `set`, `get` |
 | UI automation | `ui click`, `keyboard`, `hover`, `scroll`, `find`, `eval`, `type`, `panel`, `fullscreen`, `mouse` |
 | Panes and tabs | `pane list`, `layout`, `focus`, `symbol`; `tab list`, `new`, `close`, `switch` |
-| Streaming | `stream quote`, `bars`, `values`, `lines`, `labels`, `tables`, `all` |
+| Streaming | `stream ohlcv`, `quote`, `bars`, `values`, `lines`, `labels`, `tables`, `all` |
 
 Most commands operate on the currently active TradingView chart. Entity IDs returned by `tv state`, `tv draw list`, or related commands are session-specific.
 
@@ -132,6 +132,45 @@ Errors are JSON on stderr. Exit codes are:
 - `2`: CDP connection failure or TradingView not running
 
 Streaming commands emit JSON Lines (one JSON object per line) until interrupted with Ctrl+C.
+
+## Multi-feed OHLCV Streaming
+
+Stream different symbols and timeframes from separate chart panes, including panes in other TradingView tabs:
+
+```bash
+tv stream ohlcv CME_MINI:ES1!@1 CME_MINI:NQ1!@5 NASDAQ:AAPL@15 --interval 250
+```
+
+The final `@` separates each symbol from its timeframe. Existing matching panes are reused. When necessary, the CLI expands a chart layout or opens another tab, configures one pane per feed, and leaves those panes and tabs open after the stream stops.
+
+Each changed feed emits one JSON object containing `symbol`, `timeframe`, `bar_time`, `open`, `high`, `low`, `close`, `volume`, `bar_index`, `observed_at`, `tab_id`, and `pane_index`. Stdout contains JSONL events only; startup notices and recoverable errors go to stderr.
+
+Python can pipe those events directly into arrays or backend calculations:
+
+```python
+import json
+import subprocess
+
+command = [
+    "tv", "stream", "ohlcv",
+    "CME_MINI:ES1!@1",
+    "CME_MINI:NQ1!@5",
+    "NASDAQ:AAPL@15",
+    "--interval", "250",
+]
+
+process = subprocess.Popen(command, stdout=subprocess.PIPE, text=True)
+try:
+    for line in process.stdout:
+        bar = json.loads(line)
+        # Append bar fields to NumPy arrays, queues, databases, or calculations here.
+        print(bar["symbol"], bar["timeframe"], bar["close"])
+finally:
+    process.terminate()
+    process.wait()
+```
+
+This polls the latest forming bar from each local chart pane; it is not a raw exchange-tick feed. A value is emitted when that pane's latest OHLCV record changes, so updates that occur between polls can be missed. The default polling interval is 250 ms and the minimum is 100 ms.
 
 ## Updating
 

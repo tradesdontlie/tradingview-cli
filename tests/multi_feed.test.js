@@ -63,6 +63,7 @@ describe('multi-feed CDP adapter', () => {
 
   it('uses escaped values and validates pane indexes before provisioning', async () => {
     const expressions = [];
+    const delays = [];
     const state = { symbol: 'TEST:OLD', timeframe: '1', hasBar: true };
     const client = {
       Runtime: {
@@ -78,7 +79,7 @@ describe('multi-feed CDP adapter', () => {
         },
       },
     };
-    const adapter = createTargetAdapter({ sleepFn: async () => {} });
+    const adapter = createTargetAdapter({ sleepFn: async (ms) => { delays.push(ms); } });
 
     await assert.rejects(
       adapter.provision(client, 1.5, { symbol: 'TEST:X', timeframe: '5', key: 'TEST:X@5' }),
@@ -91,6 +92,7 @@ describe('multi-feed CDP adapter', () => {
     });
     assert.ok(expressions.some((expression) => expression.includes('"TEST:`${danger}`"')));
     assert.ok(expressions.some((expression) => expression.includes('setResolution("5"')));
+    assert.ok(delays.filter((ms) => ms >= 500).length >= 2, 'symbol and timeframe changes each get a settle window');
   });
 
   it('samples validated pane indexes with source identity', async () => {

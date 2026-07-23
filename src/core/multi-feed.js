@@ -222,11 +222,13 @@ export function createTargetAdapter({
           var series = all[i].model().mainSeries();
           var bars = series.bars();
           var last = bars.lastIndex();
+          var status = typeof series.status === 'function' ? series.status() : null;
           panes.push({
             index: i,
             symbol: series.symbol(),
             timeframe: String(series.interval()),
-            hasBar: last >= 0 && !!bars.valueAt(last),
+            status: status,
+            hasBar: (status == null || status === 3) && last >= 0 && !!bars.valueAt(last),
           });
         } catch (error) {
           panes.push({ index: i, symbol: null, timeframe: null, hasBar: false, error: error.message });
@@ -278,6 +280,7 @@ export function createTargetAdapter({
           return pane.setSymbol(${safeString(feed.symbol)}, {});
         })()
       `, true);
+      await sleepFn(750);
 
       for (let attempt = 0; attempt < 60; attempt++) {
         const current = await adapter.inventory(client, '');
@@ -293,6 +296,7 @@ export function createTargetAdapter({
           return pane.setResolution(${safeString(feed.timeframe)}, {});
         })()
       `, true);
+      await sleepFn(750);
 
       for (let attempt = 0; attempt < 60; attempt++) {
         const current = await adapter.inventory(client, '');

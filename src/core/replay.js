@@ -13,6 +13,7 @@ function _resolve(deps) {
   return {
     evaluate: deps?.evaluate || _evaluate,
     getReplayApi: deps?.getReplayApi || _getReplayApi,
+    sleep: deps?.sleep || ((ms) => new Promise((resolve) => setTimeout(resolve, ms))),
   };
 }
 
@@ -93,14 +94,19 @@ export async function autoplay({ speed, _deps } = {}) {
 }
 
 export async function stop({ _deps } = {}) {
-  const { evaluate, getReplayApi } = _resolve(_deps);
+  const { evaluate, getReplayApi, sleep } = _resolve(_deps);
   const rp = await getReplayApi();
   const started = await evaluate(wv(`${rp}.isReplayStarted()`));
   if (!started) {
     return { success: true, action: 'already_stopped' };
   }
   await evaluate(`${rp}.stopReplay()`);
-  return { success: true, action: 'replay_stopped' };
+  for (let attempt = 0; attempt < 20; attempt++) {
+    await sleep(250);
+    const stillStarted = await evaluate(wv(`${rp}.isReplayStarted()`));
+    if (!stillStarted) return { success: true, action: 'replay_stopped' };
+  }
+  throw new Error('Replay did not stop within 5 seconds.');
 }
 
 export async function trade({ action, _deps }) {

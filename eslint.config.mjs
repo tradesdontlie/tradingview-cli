@@ -19,7 +19,7 @@ export default [
         process: 'readonly', Buffer: 'readonly', URL: 'readonly',
         URLSearchParams: 'readonly', WebSocket: 'readonly', AbortController: 'readonly',
         TextEncoder: 'readonly', TextDecoder: 'readonly', global: 'readonly',
-        __dirname: 'readonly', structuredClone: 'readonly',
+        __dirname: 'readonly', structuredClone: 'readonly', queueMicrotask: 'readonly',
       },
     },
     rules: {

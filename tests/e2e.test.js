@@ -4,7 +4,7 @@
  *
  * Run: node --test tests/e2e.test.js
  *
- * Coverage: 70+ tests across 12 tool modules
+ * Coverage: 70+ checks across 12 functional areas
  * - Health & Connection
  * - Chart Control
  * - Data Access
@@ -15,13 +15,14 @@
  * - Alerts
  * - Watchlist
  * - Indicators
- * - Batch (1 tool)
- * - Capture (1 tool)
+ * - Multi-chart workflows
+ * - Capture
  */
 
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import CDP from 'chrome-remote-interface';
+import { stop as stopReplay } from '../src/core/replay.js';
 
 let client;
 let Runtime;
@@ -82,7 +83,7 @@ describe('TradingView CLI — Full E2E', () => {
       Runtime = client.Runtime;
       Input = client.Input;
       Page = client.Page;
-    } catch (err) {
+    } catch {
       console.error('Cannot connect to TradingView. Make sure it is running with --remote-debugging-port=9222');
       process.exit(1);
     }
@@ -146,12 +147,34 @@ describe('TradingView CLI — Full E2E', () => {
     });
 
     it('resolves the TradingView binary path', async () => {
-      // tv_launch is destructive (kills TradingView), so we only test path detection
+      // `tv launch` is destructive (kills TradingView), so we only test path detection
       const { existsSync } = await import('fs');
-      const paths = [
-        '/Applications/TradingView.app/Contents/MacOS/TradingView',
-        `${process.env.HOME}/Applications/TradingView.app/Contents/MacOS/TradingView`,
-      ];
+      const paths = process.platform === 'win32'
+        ? [
+          `${process.env.LOCALAPPDATA}\\TradingView\\TradingView.exe`,
+          `${process.env.PROGRAMFILES}\\TradingView\\TradingView.exe`,
+          `${process.env['PROGRAMFILES(X86)']}\\TradingView\\TradingView.exe`,
+        ]
+        : process.platform === 'darwin'
+          ? [
+            '/Applications/TradingView.app/Contents/MacOS/TradingView',
+            `${process.env.HOME}/Applications/TradingView.app/Contents/MacOS/TradingView`,
+          ]
+          : [
+            '/opt/TradingView/tradingview',
+            '/opt/TradingView/TradingView',
+            '/usr/bin/tradingview',
+            '/snap/tradingview/current/tradingview',
+          ];
+      if (process.platform === 'win32' && !paths.some(p => existsSync(p))) {
+        const { execFileSync } = await import('child_process');
+        const installDir = execFileSync('powershell', [
+          '-NoProfile',
+          '-Command',
+          "(Get-AppxPackage -Name 'TradingView.Desktop' -ErrorAction SilentlyContinue).InstallLocation",
+        ], { encoding: 'utf8' }).trim();
+        if (installDir) paths.push(`${installDir}\\TradingView.exe`);
+      }
       const found = paths.some(p => existsSync(p));
       assert.ok(found, 'TradingView binary found on disk');
     });
@@ -761,7 +784,7 @@ describe('TradingView CLI — Full E2E', () => {
       }
     });
 
-    it('pine_compile — add to chart button', async () => {
+    it('tv pine compile — add to chart button', async () => {
       const ready = await ensureEditor();
       if (!ready) return;
       // Just verify we can find compile buttons
@@ -781,8 +804,8 @@ describe('TradingView CLI — Full E2E', () => {
       assert.ok(Array.isArray(buttons), 'Button scan works');
     });
 
-    it('pine_smart_compile — detect button + check errors', async () => {
-      // Same as pine_compile but also checks Monaco markers
+    it('tv pine compile — detect button + check errors', async () => {
+      // Smart compilation also checks Monaco markers.
       const ready = await ensureEditor();
       if (!ready) return;
       const markers = await evaluate(`
@@ -877,7 +900,7 @@ indicator("Test")
 a = array.from(1, 2, 3)
 val = array.get(a, 5)`;
 
-      // Inline the analysis logic (same as the tool)
+      // Inline the same static analysis logic used by the command.
       const lines = source.split('\n');
       const arrays = new Map();
       const diagnostics = [];
@@ -1163,10 +1186,7 @@ val = array.get(a, 5)`;
         const rp = REPLAY_API;
         const started = await evaluate(wv(`${rp}.isReplayStarted()`));
         if (started) {
-          await evaluate(`${rp}.stopReplay()`);
-          await evaluate(`${rp}.goToRealtime()`);
-          await evaluate(`${rp}.hideReplayToolbar()`);
-          await sleep(500);
+          await stopReplay({ _deps: { evaluate, getReplayApi: async () => rp, sleep } });
         }
       } catch {}
     });
@@ -1240,13 +1260,11 @@ val = array.get(a, 5)`;
       const started = await evaluate(wv(`${REPLAY_API}.isReplayStarted()`));
       if (!started) return;
 
-      await evaluate(`${REPLAY_API}.stopReplay()`);
-      await evaluate(`${REPLAY_API}.goToRealtime()`);
-      await evaluate(`${REPLAY_API}.hideReplayToolbar()`);
-      await sleep(500);
-
-      const stoppedNow = await evaluate(wv(`${REPLAY_API}.isReplayStarted()`));
-      assert.ok(!stoppedNow, 'Replay stopped');
+      const result = await stopReplay({
+        _deps: { evaluate, getReplayApi: async () => REPLAY_API, sleep },
+      });
+      assert.equal(result.action, 'replay_stopped');
+      assert.equal(await evaluate(wv(`${REPLAY_API}.isReplayStarted()`)), false, 'Replay stopped');
     });
   });
 
@@ -1379,7 +1397,7 @@ val = array.get(a, 5)`;
     });
   });
 
-  // ─── 11. BATCH (1 tool) ───────────────────────────────────────────────
+  // ─── 11. MULTI-CHART WORKFLOWS ────────────────────────────────────────
 
   describe('Batch', () => {
 
@@ -1398,7 +1416,7 @@ val = array.get(a, 5)`;
     });
   });
 
-  // ─── 12. CAPTURE (1 tool) ─────────────────────────────────────────────
+  // ─── 12. CAPTURE ──────────────────────────────────────────────────────
 
   describe('Capture', () => {
 
@@ -1576,7 +1594,7 @@ val = array.get(a, 5)`;
     });
 
     it('capture_screenshot returns path, not image data', async () => {
-      // The tool saves to disk and returns path — verify size of response structure
+      // Capture saves to disk and returns a path — verify the response structure.
       const response = JSON.stringify({
         success: true,
         method: 'cdp',

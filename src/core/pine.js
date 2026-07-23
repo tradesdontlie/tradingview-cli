@@ -179,7 +179,7 @@ export function analyze({ source }) {
     success: true,
     issue_count: diagnostics.length,
     diagnostics,
-    note: diagnostics.length === 0 ? 'No static analysis issues found. Use pine_compile or pine_smart_compile for full server-side compilation check.' : undefined,
+    note: diagnostics.length === 0 ? 'No static analysis issues found. Use `tv pine compile` against the open editor or `tv pine check` for a server-side compilation check.' : undefined,
   };
 }
 
