@@ -10,7 +10,7 @@
     "tv": "node src/cli/index.js",
     "lint": "eslint src/ tests/",
     "test": "npm run test:unit",
-    "test:unit": "node --test tests/cli.test.js tests/extraction.test.js tests/pine_analyze.test.js tests/sanitization.test.js tests/replay.test.js tests/launch.test.js tests/chart_indicator.test.js tests/chart_history.test.js tests/update.test.js tests/multi_feed.test.js",
+    "test:unit": "node --test tests/cli.test.js tests/extraction.test.js tests/pine_analyze.test.js tests/sanitization.test.js tests/replay.test.js tests/launch.test.js tests/chart_indicator.test.js tests/chart_history.test.js tests/update.test.js tests/multi_feed.test.js tests/tab.test.js",
     "test:e2e": "node --test tests/e2e.test.js",
     "test:all": "node --test tests/*.test.js"
   },

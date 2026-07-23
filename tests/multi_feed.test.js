@@ -231,6 +231,44 @@ describe('multi-feed pane assignment', () => {
     assert.equal(prepared.bindings.length, 17);
     assert.equal(new Set(prepared.bindings.map((x) => `${x.targetId}:${x.paneIndex}`)).size, 17);
   });
+
+  it('falls back to the largest account-supported layout and continues in new tabs', async () => {
+    const requested = parseFeedSpecs(Array.from({ length: 17 }, (_, i) => `TEST:P${i}@1`));
+    const tabs = new Map([
+      ['tab-a', [{ index: 0, symbol: 'TEST:P0', timeframe: '1', hasBar: true }]],
+    ]);
+    const layoutAttempts = [];
+    let opened = 0;
+    const capacities = new Map([['s', 1], ['2h', 2], ['3h', 3], ['4', 4], ['6', 6], ['8', 8], ['10', 10], ['12', 12], ['14', 14], ['16', 16]]);
+    const adapter = {
+      async discover() { return [...tabs.keys()].map((id, i) => ({ id, visible: i === 0 })); },
+      async attach(id) { return { id }; },
+      async inventory(client, targetId) {
+        return { targetId, visible: client.id === 'tab-a', panes: tabs.get(targetId).map((pane) => ({ ...pane })) };
+      },
+      async setLayout(client, code) {
+        const capacity = capacities.get(code);
+        layoutAttempts.push(capacity);
+        if (capacity > 8) throw new Error('layout requires a higher TradingView plan');
+        const panes = tabs.get(client.id);
+        while (panes.length < capacity) panes.push({ index: panes.length, symbol: 'EMPTY', timeframe: '1', hasBar: true });
+      },
+      async provision(client, paneIndex, feed) {
+        tabs.get(client.id)[paneIndex] = { index: paneIndex, symbol: feed.symbol, timeframe: feed.timeframe, hasBar: true };
+      },
+      async openTab() {
+        opened += 1;
+        tabs.set(`tab-${opened + 1}`, [{ index: 0, symbol: 'EMPTY', timeframe: '1', hasBar: true }]);
+      },
+    };
+
+    const prepared = await prepareFeedBindings(requested, adapter);
+    assert.ok(layoutAttempts.includes(16));
+    assert.ok(layoutAttempts.includes(8));
+    assert.equal(opened, 2);
+    assert.equal(prepared.bindings.length, 17);
+    assert.equal(new Set(prepared.bindings.map((x) => `${x.targetId}:${x.paneIndex}`)).size, 17);
+  });
 });
 
 describe('multi-feed event streaming', () => {

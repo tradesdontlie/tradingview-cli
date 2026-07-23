@@ -87,6 +87,7 @@ export function planFeedAssignments(feeds, inventories) {
 export async function prepareFeedBindings(feeds, adapter) {
   const clients = new Map();
   let inventories = [];
+  let layoutCapacityCeiling = 16;
 
   const refresh = async () => {
     const targets = await adapter.discover();
@@ -115,6 +116,23 @@ export async function prepareFeedBindings(feeds, adapter) {
     }
     return remaining;
   };
+  const expandLayout = async (client, currentCount, desiredCount) => {
+    const ideal = chooseLayout(desiredCount);
+    const upper = Math.min(layoutCapacityCeiling, ideal?.capacity || layoutCapacityCeiling);
+    const candidates = SUPPORTED_LAYOUTS
+      .filter((layout) => layout.capacity > currentCount && layout.capacity <= upper)
+      .toReversed();
+    for (const layout of candidates) {
+      try {
+        await adapter.setLayout(client, layout.code);
+        return layout;
+      } catch {
+        const lower = SUPPORTED_LAYOUTS.filter((candidate) => candidate.capacity < layout.capacity).at(-1);
+        layoutCapacityCeiling = Math.min(layoutCapacityCeiling, lower?.capacity || currentCount);
+      }
+    }
+    return null;
+  };
 
   try {
     await refresh();
@@ -126,9 +144,12 @@ export async function prepareFeedBindings(feeds, adapter) {
       const expandable = inventories.find((inventory) => inventory.visible && inventory.panes.length < 16)
         || inventories.find((inventory) => inventory.panes.length < 16);
       if (expandable) {
-        const layout = chooseLayout(Math.min(16, expandable.panes.length + missing.length));
-        if (layout && layout.capacity > expandable.panes.length) {
-          await adapter.setLayout(clients.get(expandable.targetId), layout.code);
+        const layout = await expandLayout(
+          clients.get(expandable.targetId),
+          expandable.panes.length,
+          Math.min(16, expandable.panes.length + missing.length)
+        );
+        if (layout) {
           await refresh();
           const reserved = assignedPaneKeys();
           const newPanes = inventories
@@ -150,10 +171,12 @@ export async function prepareFeedBindings(feeds, adapter) {
       const created = inventories.find((inventory) => !before.has(inventory.targetId));
       if (!created) throw new Error('A new TradingView tab was requested but no new chart target appeared.');
 
-      const layout = chooseLayout(Math.min(16, missing.length));
-      if (!layout) throw new Error(`No supported TradingView layout can hold ${missing.length} feeds.`);
-      if (layout.capacity > created.panes.length) {
-        await adapter.setLayout(clients.get(created.targetId), layout.code);
+      const layout = await expandLayout(
+        clients.get(created.targetId),
+        created.panes.length,
+        Math.min(16, missing.length)
+      );
+      if (layout) {
         await refresh();
       }
       const targetInventory = inventories.find((inventory) => inventory.targetId === created.targetId);

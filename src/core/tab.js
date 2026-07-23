@@ -90,6 +90,18 @@ async function findLandingTarget() {
   return targets.find(t => t.type === 'page' && t.title === 'New tab') || null;
 }
 
+export async function waitForLandingTarget(
+  find = findLandingTarget,
+  { attempts = 60, interval = 500, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) } = {}
+) {
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    const target = await find();
+    if (target) return target;
+    if (attempt < attempts - 1) await sleep(interval);
+  }
+  return null;
+}
+
 /** Run fn with an eval helper attached to a specific target. */
 async function withTarget(targetId, fn) {
   let c = null;
@@ -131,7 +143,7 @@ export async function newTab({ layout, name, reconnect = true } = {}) {
       const after = await evalIn(`document.querySelectorAll('.tabs-container .tab').length`);
       return { before, after };
     });
-    landing = await findLandingTarget();
+    landing = await waitForLandingTarget();
   }
 
   if (!layout) {
