@@ -10,7 +10,17 @@ import { evaluate, evaluateAsync, getClient } from '../connection.js';
 // TV renamed the right-rail button: current builds use data-name="base" with
 // aria-label "Watchlist, details, and news"; older builds used
 // data-name="base-watchlist-widget-button" / aria-label "Watchlist".
-const WL_BUTTON_JS = `(document.querySelector('[data-name="base-watchlist-widget-button"]')
+//
+// data-name is tried first because it is the only language-independent handle.
+// The aria-label is localized, so on a non-English UI every aria-label lookup
+// misses and get/add/addBulk/remove all fail with "Watchlist button not found".
+// Verified on a Japanese UI (jp.tradingview.com, TVDesktop 3.4.0): the button
+// is <div data-name="base" aria-label="ウォッチリスト・詳細・ニュース">, and the
+// same element on www.tradingview.com carries aria-label "Watchlist, details,
+// and news". The aria-label lookups stay as fallbacks for builds that predate
+// data-name="base".
+const WL_BUTTON_JS = `(document.querySelector('[data-name="base"]')
+  || document.querySelector('[data-name="base-watchlist-widget-button"]')
   || document.querySelector('[aria-label="Watchlist, details, and news"]')
   || document.querySelector('[aria-label^="Watchlist"]'))`;
 
