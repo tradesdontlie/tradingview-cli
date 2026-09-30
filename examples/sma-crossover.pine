@@ -1,0 +1,17 @@
+//@version=6
+// Plumbing example, not a strategy recommendation. Orders use TradingView's broker emulator.
+strategy("TV CLI Example SMA", overlay=true, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=10, commission_type=strategy.commission.percent, commission_value=0.05, slippage=1, pyramiding=0, calc_on_every_tick=false, process_orders_on_close=false)
+fastLength = input.int(10, "Fast SMA", minval=1)
+slowLength = input.int(30, "Slow SMA", minval=2)
+startTime = input.time(0, "Start (UTC)")
+endTime = input.time(timestamp("01 Jan 2100 00:00 +0000"), "End (UTC)")
+fast = ta.sma(close, fastLength)
+slow = ta.sma(close, slowLength)
+crossUp = ta.crossover(fast, slow)
+crossDown = ta.crossunder(fast, slow)
+if barstate.isconfirmed and time >= startTime and time < endTime and crossUp
+    strategy.entry("Long", strategy.long)
+if barstate.isconfirmed and (crossDown or time >= endTime)
+    strategy.close("Long")
+plot(fast, "Fast SMA", color=color.teal)
+plot(slow, "Slow SMA", color=color.orange)

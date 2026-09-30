@@ -10,6 +10,7 @@
  * (Approach from issue #155 and PR #163, verified on Desktop 3.1.0.)
  */
 import CDP from 'chrome-remote-interface';
+import { isLandingTarget, clickNewTabButton, landingTabResult } from './desktop-dom.js';
 import { getClient, reconnectTo, CDP_HOST, CDP_PORT } from '../connection.js';
 
 /**
@@ -22,7 +23,7 @@ export async function list() {
   // Chart tabs plus new-tab landing pages (layout picker), so every tab in the
   // top bar is listable and switchable.
   const tabs = targets
-    .filter(t => t.type === 'page' && (/tradingview\.com\/chart/i.test(t.url) || t.title === 'New tab'))
+    .filter(t => t.type === 'page' && (/tradingview\.com\/chart/i.test(t.url) || isLandingTarget(t)))
     .map((t, i) => ({
       index: i,
       id: t.id,
@@ -87,7 +88,7 @@ async function isTargetVisible(targetId) {
 async function findLandingTarget() {
   const resp = await fetch(`http://${CDP_HOST}:${CDP_PORT}/json/list`);
   const targets = await resp.json();
-  return targets.find(t => t.type === 'page' && t.title === 'New tab') || null;
+  return targets.find(isLandingTarget) || null;
 }
 
 export async function waitForLandingTarget(
@@ -125,36 +126,15 @@ async function withTarget(targetId, fn) {
  */
 export async function newTab({ layout, name, reconnect = true } = {}) {
   let landing = await findLandingTarget();
-  let shellCounts = null;
-
   if (!landing) {
-    shellCounts = await withShell(async (evalIn) => {
-      const before = await evalIn(`document.querySelectorAll('.tabs-container .tab').length`);
-      const clicked = await evalIn(`
-        (function() {
-          var btn = document.querySelector('[class*="create-new-tab"]');
-          if (!btn) return false;
-          btn.click();
-          return true;
-        })()
-      `);
+    await withShell(async (evalIn) => {
+      const clicked = await evalIn(`(${clickNewTabButton.toString()})(document)`);
       if (!clicked) throw new Error('New-tab button not found in shell window.');
       await new Promise(r => setTimeout(r, 1500));
-      const after = await evalIn(`document.querySelectorAll('.tabs-container .tab').length`);
-      return { before, after };
     });
     landing = await waitForLandingTarget();
   }
-
-  if (!layout) {
-    const state = await list();
-    return {
-      success: shellCounts ? shellCounts.after > shellCounts.before : !!landing,
-      action: 'new_tab_opened',
-      note: 'Tab is on the layout picker. Call tab_new with layout: "new" or a saved layout name to open a chart in it.',
-      ...state,
-    };
-  }
+  if (!layout) return landingTabResult(await list(), landing);
 
   if (!landing) throw new Error('New tab opened but its landing page target was not found.');
 

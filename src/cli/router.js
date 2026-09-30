@@ -3,6 +3,7 @@
  * Zero dependencies — uses only Node.js built-ins.
  */
 import { parseArgs } from 'node:util';
+import { disconnect } from '../connection.js';
 
 /** @type {Map<string, { description: string, options?: object, handler: Function, subcommands?: Map<string, object> }>} */
 const commands = new Map();
@@ -132,9 +133,13 @@ async function execute(handler, values, positionals) {
   try {
     const result = await handler(values, positionals);
     console.log(JSON.stringify(result, null, 2));
-    process.exit(0);
+    process.exitCode = 0;
   } catch (err) {
     handleError(err);
+  } finally {
+    // Close CDP explicitly and let pending stdout/HTTP handles drain. Forcing
+    // exit after fetch() can abort in libuv on Windows Node.js 24.
+    await disconnect();
   }
 }
 
@@ -143,8 +148,9 @@ function handleError(err) {
   // Connection failures get exit code 2
   if (/CDP|connection|ECONNREFUSED|not running/i.test(message)) {
     console.error(JSON.stringify({ success: false, error: message }, null, 2));
-    process.exit(2);
+    process.exitCode = 2;
+    return;
   }
   console.error(JSON.stringify({ success: false, error: message }, null, 2));
-  process.exit(1);
+  process.exitCode = 1;
 }

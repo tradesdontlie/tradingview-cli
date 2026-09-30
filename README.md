@@ -92,6 +92,8 @@ tv stream quote --interval 500 | jq .close
 
 Run `tv --help`, `tv <command> --help`, or `tv <command> <subcommand> --help` for the current options.
 
+For a sequential Pine parameter sweep with source verification and cleanup, see [the batch example](examples/README.md). It selects an explicit disposable chart layout and writes Strategy Tester metrics to JSON.
+
 ## Commands
 
 | Area | Commands |
